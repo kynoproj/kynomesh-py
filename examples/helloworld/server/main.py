@@ -42,7 +42,8 @@ class HelloWorldAgentExecutor(AgentExecutor):
 
 def hello_world_card() -> AgentCard:
     # The URLs below are ignored when running in a K8s cluster; supplying
-    # 127.0.0.1:8088 is helpful when doing local dev testing.
+    # the local-dev HTTP (8088) and gRPC (8089) ports is helpful when
+    # doing local dev testing.
     return AgentCard(
         name="Hello World Agent",
         description="Just a hello world agent",
@@ -55,6 +56,10 @@ def hello_world_card() -> AgentCard:
             AgentInterface(
                 url="http://127.0.0.1:8088",
                 protocol_binding=TransportProtocol.HTTP_JSON.value,
+            ),
+            AgentInterface(
+                url="127.0.0.1:8089",
+                protocol_binding=TransportProtocol.GRPC.value,
             ),
         ],
         default_input_modes=["text"],

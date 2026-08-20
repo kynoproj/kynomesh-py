@@ -1,16 +1,19 @@
 """In-agent A2A server helper for Kynomesh.
 
-start() binds a UDS at /var/run/kynomesh/broker.sock in-pod (POD_NAME set)
-or 127.0.0.1:8088 locally, and mounts the JSON-RPC and REST transports
-listed in card.supported_interfaces.
+start() binds two independent listeners, one for HTTP (AgentCard,
+JSON-RPC, REST, /healthz) and one for gRPC (A2A gRPC transport,
+grpc.health.v1); locally each defaults to its own TCP port
+(127.0.0.1:8088 for HTTP, 127.0.0.1:8089 for gRPC). start() mounts the
+transports listed in card.supported_interfaces.
 """
 
 from kynomesh.server.health import HEALTH_PATH, Health
 from kynomesh.server.server import (
     Option,
     start,
-    with_address,
+    with_grpc_address,
     with_health,
+    with_http_address,
     with_shutdown_timeout,
     with_task_store,
 )
@@ -20,8 +23,9 @@ __all__ = [
     "Health",
     "Option",
     "start",
-    "with_address",
+    "with_grpc_address",
     "with_health",
+    "with_http_address",
     "with_shutdown_timeout",
     "with_task_store",
 ]
