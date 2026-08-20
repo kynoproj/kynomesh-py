@@ -1,12 +1,12 @@
 import os
 
-import pytest
-
 from kynomesh.server import _listener
 
 
 def test_resolve_listener_explicit_tcp():
-    cfg = _listener.resolve_listener("localhost:9090")
+    cfg = _listener.resolve_listener(
+        "localhost:9090", "/var/run/x-uds", "127.0.0.1:1"
+    )
     assert cfg.network == "tcp"
     assert cfg.address == "localhost:9090"
     assert not cfg.is_uds
@@ -14,7 +14,7 @@ def test_resolve_listener_explicit_tcp():
 
 def test_resolve_listener_explicit_uds(tmp_path):
     addr = str(tmp_path / "broker.sock")
-    cfg = _listener.resolve_listener(addr)
+    cfg = _listener.resolve_listener(addr, "/var/run/x-uds", "127.0.0.1:1")
     assert cfg.network == "unix"
     assert cfg.address == addr
     assert cfg.is_uds
@@ -22,17 +22,35 @@ def test_resolve_listener_explicit_uds(tmp_path):
 
 def test_resolve_listener_default_local(monkeypatch):
     monkeypatch.delenv("POD_NAME", raising=False)
-    cfg = _listener.resolve_listener(None)
-    assert cfg == _listener.ListenerConfig(
-        network="tcp", address=_listener.DEFAULT_LOCAL_ADDR
-    )
+    cfg = _listener.resolve_listener(None, "/var/run/x-uds", "127.0.0.1:1")
+    assert cfg == _listener.ListenerConfig(network="tcp", address="127.0.0.1:1")
 
 
 def test_resolve_listener_in_pod(monkeypatch):
     monkeypatch.setenv("POD_NAME", "agent-0")
-    cfg = _listener.resolve_listener(None)
-    assert cfg == _listener.ListenerConfig(
-        network="unix", address=_listener.BROKER_SOCKET_PATH
+    cfg = _listener.resolve_listener(None, "/var/run/x-uds", "127.0.0.1:1")
+    assert cfg == _listener.ListenerConfig(network="unix", address="/var/run/x-uds")
+
+
+def test_resolve_listeners_defaults_local(monkeypatch):
+    monkeypatch.delenv("POD_NAME", raising=False)
+    http_cfg, grpc_cfg = _listener.resolve_listeners(None, None)
+    assert http_cfg == _listener.ListenerConfig(
+        network="tcp", address=_listener.DEFAULT_LOCAL_HTTP_ADDR
+    )
+    assert grpc_cfg == _listener.ListenerConfig(
+        network="tcp", address=_listener.DEFAULT_LOCAL_GRPC_ADDR
+    )
+
+
+def test_resolve_listeners_defaults_in_pod(monkeypatch):
+    monkeypatch.setenv("POD_NAME", "agent-0")
+    http_cfg, grpc_cfg = _listener.resolve_listeners(None, None)
+    assert http_cfg == _listener.ListenerConfig(
+        network="unix", address=_listener.BROKER_HTTP_SOCKET_PATH
+    )
+    assert grpc_cfg == _listener.ListenerConfig(
+        network="unix", address=_listener.BROKER_GRPC_SOCKET_PATH
     )
 
 
