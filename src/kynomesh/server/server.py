@@ -176,13 +176,12 @@ async def start(
 ) -> None:
     """Starts an A2A server for executor, serving until cancelled.
 
-    Mirrors kynomesh-go's server.Start: resolves the HTTP and gRPC
-    listeners (Unix domain sockets in-pod, local TCP ports otherwise),
-    mounts the transports listed in card.supported_interfaces, and
-    advertises the agent to the broker when running in-pod. Raises if
-    executor or card is missing, or on listener or server startup
-    failure. Returns when the enclosing task is cancelled, after a
-    graceful shutdown of both listeners.
+    Resolves the HTTP and gRPC listeners (Unix domain sockets in-pod, 
+    local TCP ports otherwise), mounts the transports listed in 
+    card.supported_interfaces, and advertises the agent to the broker 
+    when running in-pod. Raises if executor or card is missing, or on 
+    listener or server startup failure. Returns when the enclosing 
+    task is cancelled, after a graceful shutdown of both listeners.
     """
     if executor is None:
         raise ValueError("kynomesh server: executor is required")
