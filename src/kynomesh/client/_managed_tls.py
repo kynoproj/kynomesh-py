@@ -1,19 +1,10 @@
 """TLS handling for Managed-peer connections.
 
-Managed peers are reached through their broker's externally-facing
-listener, which always terminates real TLS with a broker-issued
-self-signed certificate — the broker's cert is not meant to be checked
-against a public CA. This mirrors Go's managedTLSConfig
-(tls.Config{InsecureSkipVerify: true}): encrypt the hop, but skip
-certificate validation, since the cert is self-signed and unpinned by
-design.
-
-Python's grpc package exposes no verify-skip hook (unlike Go's
-crypto/tls), so gRPC connections to Managed peers fetch the broker's
-certificate once per peer and pin it as the trusted root, with
-hostname verification disabled via ssl_target_name_override. This is
-TLS-encrypted but, like Go's InsecureSkipVerify, does not authenticate
-the peer beyond "whatever certificate is presented on the first
+Python's grpc package exposes no verify-skip hook, so gRPC connections 
+to Managed peers fetch the broker's certificate once per peer and pin 
+it as the trusted root, with hostname verification disabled via 
+ssl_target_name_override. This is TLS-encrypted but does not authenticate
+the peer beyond "whatever certificate is presented on the first 
 connection."
 """
 

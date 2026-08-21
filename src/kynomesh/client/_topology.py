@@ -39,7 +39,7 @@ class PeerNotFoundError(Exception):
 
 @dataclass(frozen=True)
 class Peer:
-    """Mirrors kmv1.Peer's JSON shape."""
+    """Mirrors Kynomesh Peer's JSON shape."""
 
     name: str
     kind: str = ""
