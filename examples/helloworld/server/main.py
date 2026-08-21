@@ -50,11 +50,11 @@ def hello_world_card() -> AgentCard:
         version="0.0.1",
         supported_interfaces=[
             AgentInterface(
-                url="http://127.0.0.1:8088",
+                url="http://127.0.0.1:8088/a2a/jsonrpc",
                 protocol_binding=TransportProtocol.JSONRPC.value,
             ),
             AgentInterface(
-                url="http://127.0.0.1:8088",
+                url="http://127.0.0.1:8088/a2a/rest",
                 protocol_binding=TransportProtocol.HTTP_JSON.value,
             ),
             AgentInterface(
