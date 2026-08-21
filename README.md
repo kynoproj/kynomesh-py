@@ -80,9 +80,7 @@ def hello_world_card() -> AgentCard:
 
 async def main() -> None:
     loop = asyncio.get_running_loop()
-    serve_task = asyncio.ensure_future(
-        server.start(HelloWorldAgentExecutor(), hello_world_card())
-    )
+    serve_task = asyncio.ensure_future(server.start(HelloWorldAgentExecutor(), hello_world_card()))
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, serve_task.cancel)
     try:
@@ -217,9 +215,9 @@ asyncio.run(main())
 Lower-level helpers when you don't want the full client:
 
 ```python
-url = client.peer_url("worker-a")                       # just the URL
-card = await client.resolve_agent_card("worker-a")       # just the AgentCard
-names = client.peers()                                  # every reachable peer
+url = client.peer_url("worker-a")  # just the URL
+card = await client.resolve_agent_card("worker-a")  # just the AgentCard
+names = client.peers()  # every reachable peer
 ```
 
 Error types for `except`/`isinstance` checks:
