@@ -58,7 +58,7 @@ class _Options:
 class Option:
     """A configuration knob applied by start(). Build with the with_* helpers."""
 
-    def __init__(self, apply: "callable[[_Options], None]") -> None:
+    def __init__(self, apply: callable[[_Options], None]) -> None:
         self._apply = apply
 
     def apply(self, options: _Options) -> None:
@@ -153,7 +153,7 @@ def _build_grpc_server(
     return grpc_server, mounted
 
 
-def _uvicorn_config(app: FastAPI, cfg: "_listener.ListenerConfig") -> uvicorn.Config:
+def _uvicorn_config(app: FastAPI, cfg: _listener.ListenerConfig) -> uvicorn.Config:
     uv_config = uvicorn.Config(app, log_level="info")
     if cfg.is_uds:
         uv_config.uds = cfg.address
@@ -164,23 +164,21 @@ def _uvicorn_config(app: FastAPI, cfg: "_listener.ListenerConfig") -> uvicorn.Co
     return uv_config
 
 
-def _bind_grpc(grpc_server: grpc.aio.Server, cfg: "_listener.ListenerConfig") -> None:
+def _bind_grpc(grpc_server: grpc.aio.Server, cfg: _listener.ListenerConfig) -> None:
     address = f"unix://{cfg.address}" if cfg.is_uds else cfg.address
     grpc_server.add_insecure_port(address)
     if cfg.is_uds:
         os.chmod(cfg.address, 0o660)
 
 
-async def start(
-    executor: AgentExecutor, card: AgentCard, *options: Option
-) -> None:
+async def start(executor: AgentExecutor, card: AgentCard, *options: Option) -> None:
     """Starts an A2A server for executor, serving until cancelled.
 
-    Resolves the HTTP and gRPC listeners (Unix domain sockets in-pod, 
-    local TCP ports otherwise), mounts the transports listed in 
-    card.supported_interfaces, and advertises the agent to the broker 
-    when running in-pod. Raises if executor or card is missing, or on 
-    listener or server startup failure. Returns when the enclosing 
+    Resolves the HTTP and gRPC listeners (Unix domain sockets in-pod,
+    local TCP ports otherwise), mounts the transports listed in
+    card.supported_interfaces, and advertises the agent to the broker
+    when running in-pod. Raises if executor or card is missing, or on
+    listener or server startup failure. Returns when the enclosing
     task is cancelled, after a graceful shutdown of both listeners.
     """
     if executor is None:
@@ -193,9 +191,7 @@ async def start(
         option.apply(opts)
     health = opts.health or Health()
 
-    http_cfg, grpc_cfg = _listener.resolve_listeners(
-        opts.http_address, opts.grpc_address
-    )
+    http_cfg, grpc_cfg = _listener.resolve_listeners(opts.http_address, opts.grpc_address)
 
     task_store = opts.task_store or InMemoryTaskStore()
     handler = DefaultRequestHandlerV2(
@@ -263,17 +259,15 @@ async def _serve_grpc(grpc_server: grpc.aio.Server) -> None:
 
 async def _shutdown(
     http_server: uvicorn.Server,
-    http_task: "asyncio.Task[None]",
+    http_task: asyncio.Task[None],
     grpc_server: grpc.aio.Server,
-    grpc_task: "asyncio.Task[None]",
+    grpc_task: asyncio.Task[None],
     shutdown_timeout: float,
 ) -> None:
     http_server.should_exit = True
     await grpc_server.stop(shutdown_timeout)
     try:
-        await asyncio.wait_for(
-            asyncio.gather(http_task, grpc_task), timeout=shutdown_timeout
-        )
+        await asyncio.wait_for(asyncio.gather(http_task, grpc_task), timeout=shutdown_timeout)
     except asyncio.TimeoutError:
         http_server.force_exit = True
         await grpc_server.stop(0)

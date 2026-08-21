@@ -79,9 +79,7 @@ def hello_world_card() -> AgentCard:
 
 async def main() -> None:
     loop = asyncio.get_running_loop()
-    serve_task = asyncio.ensure_future(
-        server.start(HelloWorldAgentExecutor(), hello_world_card())
-    )
+    serve_task = asyncio.ensure_future(server.start(HelloWorldAgentExecutor(), hello_world_card()))
 
     def _cancel() -> None:
         serve_task.cancel()

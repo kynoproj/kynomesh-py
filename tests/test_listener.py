@@ -4,9 +4,7 @@ from kynomesh.server import _listener
 
 
 def test_resolve_listener_explicit_tcp():
-    cfg = _listener.resolve_listener(
-        "localhost:9090", "/var/run/x-uds", "127.0.0.1:1"
-    )
+    cfg = _listener.resolve_listener("localhost:9090", "/var/run/x-uds", "127.0.0.1:1")
     assert cfg.network == "tcp"
     assert cfg.address == "localhost:9090"
     assert not cfg.is_uds

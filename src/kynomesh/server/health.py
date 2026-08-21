@@ -58,7 +58,7 @@ class Health:
             return PlainTextResponse("SERVING\n", status_code=200)
         return PlainTextResponse("NOT_SERVING\n", status_code=503)
 
-    def attach_grpc(self, server: "grpc.aio.Server") -> None:  # noqa: F821
+    def attach_grpc(self, server: grpc.aio.Server) -> None:  # noqa: F821
         """Binds this Health to server and registers grpc.health.v1.
 
         Each start() call owns its own gRPC server; sharing one Health
@@ -77,7 +77,5 @@ class Health:
     def _set_grpc_status(servicer: object, serving: bool) -> None:
         from grpc_health.v1.health_pb2 import HealthCheckResponse
 
-        status = (
-            HealthCheckResponse.SERVING if serving else HealthCheckResponse.NOT_SERVING
-        )
+        status = HealthCheckResponse.SERVING if serving else HealthCheckResponse.NOT_SERVING
         servicer.set(_GRPC_HEALTH_SERVICE, status)

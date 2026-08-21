@@ -36,9 +36,7 @@ def _in_pod() -> bool:
     return bool(os.environ.get(_ENV_POD_NAME))
 
 
-def resolve_listener(
-    explicit: str | None, uds_default: str, tcp_default: str
-) -> ListenerConfig:
+def resolve_listener(explicit: str | None, uds_default: str, tcp_default: str) -> ListenerConfig:
     """Resolves a single listener's network/address.
 
     An explicit absolute-path address opens a Unix domain socket; anything
@@ -57,12 +55,8 @@ def resolve_listeners(
     http_address: str | None, grpc_address: str | None
 ) -> tuple[ListenerConfig, ListenerConfig]:
     """Resolves the HTTP and gRPC listener targets."""
-    http_cfg = resolve_listener(
-        http_address, BROKER_HTTP_SOCKET_PATH, DEFAULT_LOCAL_HTTP_ADDR
-    )
-    grpc_cfg = resolve_listener(
-        grpc_address, BROKER_GRPC_SOCKET_PATH, DEFAULT_LOCAL_GRPC_ADDR
-    )
+    http_cfg = resolve_listener(http_address, BROKER_HTTP_SOCKET_PATH, DEFAULT_LOCAL_HTTP_ADDR)
+    grpc_cfg = resolve_listener(grpc_address, BROKER_GRPC_SOCKET_PATH, DEFAULT_LOCAL_GRPC_ADDR)
     return http_cfg, grpc_cfg
 
 
@@ -74,9 +68,7 @@ def prepare_uds_path(path: str) -> None:
         os.remove(path)
 
 
-def write_server_info(
-    http_cfg: ListenerConfig, path: str = serverinfo.DEFAULT_FILE_PATH
-) -> None:
+def write_server_info(http_cfg: ListenerConfig, path: str = serverinfo.DEFAULT_FILE_PATH) -> None:
     """Publishes the agent's metadata so the colocated broker can read it at startup."""
     protocol = serverinfo.PROTOCOL_UDS if http_cfg.is_uds else serverinfo.PROTOCOL_TCP
     serverinfo.write(path, serverinfo.default(protocol))

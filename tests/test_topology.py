@@ -71,11 +71,7 @@ def test_external_peer_is_not_managed(tmp_path):
     topo_path = tmp_path / "topology.json"
     _write_topology(
         topo_path,
-        {
-            "peers": [
-                {"name": "ext", "kind": "External", "url": "https://ext.example.com"}
-            ]
-        },
+        {"peers": [{"name": "ext", "kind": "External", "url": "https://ext.example.com"}]},
     )
     _topology._topology_path = str(topo_path)
 
