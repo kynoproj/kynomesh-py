@@ -1,10 +1,10 @@
 """TLS handling for Managed-peer connections.
 
-Python's grpc package exposes no verify-skip hook, so gRPC connections 
-to Managed peers fetch the broker's certificate once per peer and pin 
-it as the trusted root, with hostname verification disabled via 
+Python's grpc package exposes no verify-skip hook, so gRPC connections
+to Managed peers fetch the broker's certificate once per peer and pin
+it as the trusted root, with hostname verification disabled via
 ssl_target_name_override. This is TLS-encrypted but does not authenticate
-the peer beyond "whatever certificate is presented on the first 
+the peer beyond "whatever certificate is presented on the first
 connection."
 """
 

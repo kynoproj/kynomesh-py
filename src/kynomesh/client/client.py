@@ -24,6 +24,8 @@ from kynomesh.client._topology import (
     PeerNotFoundError,
     TopologyNotAvailableError,
     lookup_peer,
+)
+from kynomesh.client._topology import (
     peer_names as _peer_names,
 )
 

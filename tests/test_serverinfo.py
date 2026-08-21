@@ -18,9 +18,7 @@ def test_write_creates_parent_dir_and_content(tmp_path):
 
 def test_write_includes_metadata_when_present(tmp_path):
     path = str(tmp_path / "server-info")
-    info = serverinfo.ServerInfo(
-        protocol=serverinfo.PROTOCOL_UDS, metadata={"foo": "bar"}
-    )
+    info = serverinfo.ServerInfo(protocol=serverinfo.PROTOCOL_UDS, metadata={"foo": "bar"})
 
     serverinfo.write(path, info)
 
