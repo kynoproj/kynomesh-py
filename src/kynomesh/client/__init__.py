@@ -7,13 +7,15 @@ which peers this agent is allowed to call and how to reach them:
 
     url = client.peer_url("worker-a")
     card = await client.resolve_agent_card("worker-a")
-    c = await client.new_for_peer("worker-a")
+    c = await client.peer_client("worker-a")
 """
 
 from kynomesh.client.client import (
     PeerNotFoundError,
     TopologyNotAvailableError,
+    forget_peer,
     new_for_peer,
+    peer_client,
     peer_url,
     peers,
     resolve_agent_card,
@@ -23,6 +25,8 @@ __all__ = [
     "PeerNotFoundError",
     "TopologyNotAvailableError",
     "new_for_peer",
+    "peer_client",
+    "forget_peer",
     "peer_url",
     "peers",
     "resolve_agent_card",

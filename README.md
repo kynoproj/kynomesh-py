@@ -176,9 +176,11 @@ delays the next status update.
 ## Client: call a peer agent
 
 Within an `AgentSet`, every agent has a set of peers it is allowed to call,
-derived from the AgentSet's routing pattern. `kynomesh.client.new_for_peer`
+derived from the AgentSet's routing pattern. `kynomesh.client.peer_client`
 collapses the whole peer-lookup + AgentCard-resolution + client-construction
-flow into one call:
+flow into one call, and caches the result: a peer's client is built at most
+once per process and reused on every later call for that peer name,
+including under concurrent first use.
 
 ```python
 import asyncio
@@ -190,27 +192,44 @@ from kynomesh import client
 
 
 async def main() -> None:
-    # Discover the peer, fetch its AgentCard, and build an a2a client.
-    # For Managed peer agents reached over gRPC, new_for_peer pins the
-    # broker's certificate for the hop (TLS-encrypted but unauthenticated,
-    # like the Go SDK's InsecureSkipVerify). Pass a ClientConfig to override.
-    a2a_client = await client.new_for_peer("worker-a")
-    try:
-        request = SendMessageRequest(
-            message=Message(
-                message_id=str(uuid.uuid4()),
-                role=Role.ROLE_USER,
-                parts=[Part(text="Hello, world")],
-            )
+    # Discover the peer, fetch its AgentCard, and build an a2a
+    # client — once per process per peer name; later calls for the
+    # same peer reuse the cached client. For Managed peer agents
+    # reached over gRPC, the first build pins the broker's certificate
+    # for the hop (TLS-encrypted but unauthenticated, like the Go
+    # SDK's InsecureSkipVerify).
+    a2a_client = await client.peer_client("worker-a")
+    request = SendMessageRequest(
+        message=Message(
+            message_id=str(uuid.uuid4()),
+            role=Role.ROLE_USER,
+            parts=[Part(text="Hello, world")],
         )
-        async for response in a2a_client.send_message(request):
-            print(response)
-    finally:
-        await a2a_client.close()
+    )
+    async for response in a2a_client.send_message(request):
+        print(response)
 
 
 asyncio.run(main())
 ```
+
+`peer_client` is lazy — a peer never gets a client built or its AgentCard
+resolved until the first call for that peer name. Because the client is
+shared and reused, callers must not call `close()` on it. To drop a peer's
+cached client and force a rebuild on the next call (e.g. after the peer's
+AgentCard changes):
+
+```python
+client.forget_peer("worker-a")
+```
+
+Concurrency scope is single-event-loop asyncio: don't share a cached peer
+client across OS threads or multiple event loops.
+
+Need a client that isn't cached (e.g. to always resolve the current
+AgentCard)? `client.new_for_peer("worker-a")` runs the same flow but always
+builds a fresh client; the caller owns it and is responsible for calling
+`await a2a_client.close()`.
 
 Lower-level helpers when you don't want the full client:
 
