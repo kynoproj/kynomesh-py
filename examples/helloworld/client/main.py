@@ -22,20 +22,18 @@ _logger = logging.getLogger(__name__)
 
 async def main(peer_name: str) -> None:
     # Look up the peer's URL, fetch its AgentCard, and build an a2a
-    # client over one of its advertised transports.
-    a2a_client = await client.new_for_peer(peer_name)
-    try:
-        request = SendMessageRequest(
-            message=Message(
-                message_id=str(uuid.uuid4()),
-                role=Role.ROLE_USER,
-                parts=[Part(text="Hello, world")],
-            )
+    # client over one of its advertised transports — once per process
+    # per peer name.
+    a2a_client = await client.peer_client(peer_name)
+    request = SendMessageRequest(
+        message=Message(
+            message_id=str(uuid.uuid4()),
+            role=Role.ROLE_USER,
+            parts=[Part(text="Hello, world")],
         )
-        async for response in a2a_client.send_message(request):
-            _logger.info("Server responded with: %s", response)
-    finally:
-        await a2a_client.close()
+    )
+    async for response in a2a_client.send_message(request):
+        _logger.info("Server responded with: %s", response)
 
 
 if __name__ == "__main__":

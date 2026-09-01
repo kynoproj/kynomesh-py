@@ -7,7 +7,7 @@ format:
 
     url = peer_url("worker-a")               # just the URL
     card = await resolve_agent_card("worker-a")
-    client = await new_for_peer("worker-a")   # ready-to-use a2a Client
+    client = await peer_client("worker-a")    # ready-to-use a2a Client, cached per peer
 """
 
 from __future__ import annotations
@@ -19,6 +19,7 @@ from a2a.client.client_factory import ClientFactory
 from a2a.types.a2a_pb2 import AgentCard
 from a2a.utils.constants import TransportProtocol
 
+from kynomesh.client._cache import AsyncKeyedCache
 from kynomesh.client._managed_tls import managed_grpc_channel, managed_httpx_client
 from kynomesh.client._topology import (
     PeerNotFoundError,
@@ -35,7 +36,8 @@ __all__ = [
     "peer_url",
     "peers",
     "resolve_agent_card",
-    "new_for_peer",
+    "peer_client",
+    "forget_peer",
 ]
 
 # default_httpx_client is used to fetch AgentCards and build clients for
@@ -80,7 +82,7 @@ async def resolve_agent_card(name: str) -> AgentCard:
     return await resolver.get_agent_card()
 
 
-async def new_for_peer(name: str, config: ClientConfig | None = None) -> Client:
+async def _new_for_peer(name: str, config: ClientConfig | None = None) -> Client:
     """Returns an a2a Client wired to the named peer.
 
     Performs the full peer-discovery flow: look up the peer URL in the
@@ -88,6 +90,10 @@ async def new_for_peer(name: str, config: ClientConfig | None = None) -> Client:
     the interfaces the card advertises. For Managed peers, TLS
     verification is skipped for both the AgentCard fetch and the client
     transport, unless config overrides those defaults.
+
+    Unexported: this always builds a fresh client (a full AgentCard
+    resolve + construction), never reuses a cached one. peer_client is
+    the public, cached entry point built on top of this.
     """
     peer = lookup_peer(name)
     if not peer.url:
@@ -111,3 +117,46 @@ async def new_for_peer(name: str, config: ClientConfig | None = None) -> Client:
 
     factory = ClientFactory(config)
     return factory.create(card)
+
+
+# _peer_client_cache lazily builds and caches one Client per peer name
+# for the life of the process. Concurrency scope is explicitly
+# single-event-loop asyncio; see peer_client's docstring.
+_peer_client_cache: AsyncKeyedCache[Client] = AsyncKeyedCache(_new_for_peer)
+
+
+async def peer_client(name: str) -> Client:
+    """Returns the cached a2a Client for the named peer, building it on
+    first use and reusing it on every subsequent call for the same
+    peer name.
+
+    Construction is lazy: a peer never gets a client built or its
+    AgentCard resolved until the first peer_client call for that name.
+    It is also safe under concurrent first-use of the same peer from
+    multiple coroutines: only one caller builds the client, and the
+    rest await its result.
+
+    Concurrency scope is explicitly single-event-loop asyncio, not
+    cross-thread. Do not share a cached peer client across OS threads
+    or multiple event loops.
+
+    Callers should not call close() on the returned client: it is
+    shared and reused by later callers. Use forget_peer(name) to drop
+    the cached entry instead.
+    """
+    return await _peer_client_cache.get(name)
+
+
+def forget_peer(name: str) -> None:
+    """Drops the cached client for the named peer, if any.
+
+    The next peer_client call for that name resolves the AgentCard and
+    builds a fresh client. Safe to call for a peer with no cached
+    entry.
+    """
+    _peer_client_cache.forget(name)
+
+
+def _reset_peer_client_cache() -> None:
+    """Drops every cached peer client. Test-only; not exposed as a public API."""
+    _peer_client_cache.reset()
