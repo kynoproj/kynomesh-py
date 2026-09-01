@@ -62,7 +62,7 @@ def _reset_topology_cache():
     _reset_peer_client_cache()
 
 
-async def test_new_for_peer_end_to_end(tmp_path, unused_tcp_port_factory):
+async def test_peer_client_end_to_end(tmp_path, unused_tcp_port_factory):
     http_port = unused_tcp_port_factory()
     grpc_port = unused_tcp_port_factory()
     http_url = f"http://127.0.0.1:{http_port}"
@@ -102,7 +102,7 @@ async def test_new_for_peer_end_to_end(tmp_path, unused_tcp_port_factory):
         assert kynomesh_client.peer_url("echo") == http_url
         assert kynomesh_client.peers() == ["echo"]
 
-        a2a_client = await kynomesh_client.new_for_peer("echo")
+        a2a_client = await kynomesh_client.peer_client("echo")
         request = SendMessageRequest(
             message=Message(
                 message_id=str(uuid.uuid4()),
@@ -112,7 +112,6 @@ async def test_new_for_peer_end_to_end(tmp_path, unused_tcp_port_factory):
         )
         responses = [r async for r in a2a_client.send_message(request)]
         assert responses[0].message.parts[0].text == "pong"
-        await a2a_client.close()
     finally:
         serve_task.cancel()
         try:

@@ -226,11 +226,6 @@ client.forget_peer("worker-a")
 Concurrency scope is single-event-loop asyncio: don't share a cached peer
 client across OS threads or multiple event loops.
 
-Need a client that isn't cached (e.g. to always resolve the current
-AgentCard)? `client.new_for_peer("worker-a")` runs the same flow but always
-builds a fresh client; the caller owns it and is responsible for calling
-`await a2a_client.close()`.
-
 Lower-level helpers when you don't want the full client:
 
 ```python

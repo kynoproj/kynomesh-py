@@ -36,7 +36,6 @@ __all__ = [
     "peer_url",
     "peers",
     "resolve_agent_card",
-    "new_for_peer",
     "peer_client",
     "forget_peer",
 ]
@@ -83,7 +82,7 @@ async def resolve_agent_card(name: str) -> AgentCard:
     return await resolver.get_agent_card()
 
 
-async def new_for_peer(name: str, config: ClientConfig | None = None) -> Client:
+async def _new_for_peer(name: str, config: ClientConfig | None = None) -> Client:
     """Returns an a2a Client wired to the named peer.
 
     Performs the full peer-discovery flow: look up the peer URL in the
@@ -91,6 +90,10 @@ async def new_for_peer(name: str, config: ClientConfig | None = None) -> Client:
     the interfaces the card advertises. For Managed peers, TLS
     verification is skipped for both the AgentCard fetch and the client
     transport, unless config overrides those defaults.
+
+    Unexported: this always builds a fresh client (a full AgentCard
+    resolve + construction), never reuses a cached one. peer_client is
+    the public, cached entry point built on top of this.
     """
     peer = lookup_peer(name)
     if not peer.url:
@@ -119,13 +122,13 @@ async def new_for_peer(name: str, config: ClientConfig | None = None) -> Client:
 # _peer_client_cache lazily builds and caches one Client per peer name
 # for the life of the process. Concurrency scope is explicitly
 # single-event-loop asyncio; see peer_client's docstring.
-_peer_client_cache: AsyncKeyedCache[Client] = AsyncKeyedCache(new_for_peer)
+_peer_client_cache: AsyncKeyedCache[Client] = AsyncKeyedCache(_new_for_peer)
 
 
 async def peer_client(name: str) -> Client:
-    """Returns the cached a2a Client for the named peer, building it via
-    new_for_peer on first use and reusing it on every subsequent call
-    for the same peer name.
+    """Returns the cached a2a Client for the named peer, building it on
+    first use and reusing it on every subsequent call for the same
+    peer name.
 
     Construction is lazy: a peer never gets a client built or its
     AgentCard resolved until the first peer_client call for that name.

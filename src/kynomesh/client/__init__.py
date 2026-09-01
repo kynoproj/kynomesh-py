@@ -14,7 +14,6 @@ from kynomesh.client.client import (
     PeerNotFoundError,
     TopologyNotAvailableError,
     forget_peer,
-    new_for_peer,
     peer_client,
     peer_url,
     peers,
@@ -24,7 +23,6 @@ from kynomesh.client.client import (
 __all__ = [
     "PeerNotFoundError",
     "TopologyNotAvailableError",
-    "new_for_peer",
     "peer_client",
     "forget_peer",
     "peer_url",
