@@ -178,9 +178,9 @@ delays the next status update.
 Within an `AgentSet`, every agent has a set of peers it is allowed to call,
 derived from the AgentSet's routing pattern. `kynomesh.client.peer_client`
 collapses the whole peer-lookup + AgentCard-resolution + client-construction
-flow into one call, and caches the result: a peer's client is built at most
-once per process and reused on every later call for that peer name,
-including under concurrent first use.
+flow into one call, and caches the result: a peer's client is built at most once
+per process and reused on every later call for that peer name, including under
+concurrent first use.
 
 ```python
 import asyncio
@@ -214,17 +214,17 @@ asyncio.run(main())
 ```
 
 `peer_client` is lazy — a peer never gets a client built or its AgentCard
-resolved until the first call for that peer name. Because the client is
-shared and reused, callers must not call `close()` on it. To drop a peer's
-cached client and force a rebuild on the next call (e.g. after the peer's
-AgentCard changes):
+resolved until the first call for that peer name. Because the client is shared
+and reused, callers must not call `close()` on it. To drop a peer's cached
+client and force a rebuild on the next call (e.g. after the peer's AgentCard
+changes):
 
 ```python
 client.forget_peer("worker-a")
 ```
 
-Concurrency scope is single-event-loop asyncio: don't share a cached peer
-client across OS threads or multiple event loops.
+Concurrency scope is single-event-loop asyncio: don't share a cached peer client
+across OS threads or multiple event loops.
 
 Lower-level helpers when you don't want the full client:
 
@@ -246,12 +246,10 @@ Full example: [examples/helloworld/client](examples/helloworld/client).
 
 ## Resources
 
-- [Kynomesh project](https://github.com/kynoproj/kynomesh)
+- [Kynomesh](https://github.com/kynoproj/kynomesh)
 - [Core concepts](https://github.com/kynoproj/kynomesh/blob/main/docs/core-concepts/overview.md)
 - [A2A protocol](https://a2a-protocol.org/)
 - [a2aproject/a2a-python](https://github.com/a2aproject/a2a-python)
-- [kynoproj/kynomesh-go](https://github.com/kynoproj/kynomesh-go) — the Go SDK
-  this project mirrors
 
 ## License
 
