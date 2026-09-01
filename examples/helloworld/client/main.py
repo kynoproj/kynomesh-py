@@ -23,8 +23,7 @@ _logger = logging.getLogger(__name__)
 async def main(peer_name: str) -> None:
     # Look up the peer's URL, fetch its AgentCard, and build an a2a
     # client over one of its advertised transports — once per process
-    # per peer name; later calls for the same peer reuse the cached
-    # client.
+    # per peer name.
     a2a_client = await client.peer_client(peer_name)
     request = SendMessageRequest(
         message=Message(
