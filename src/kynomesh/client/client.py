@@ -20,6 +20,7 @@ from a2a.types.a2a_pb2 import AgentCard
 from a2a.utils.constants import TransportProtocol
 
 from kynomesh.client._cache import AsyncKeyedCache
+from kynomesh.client._hash import record_peer_hash
 from kynomesh.client._managed_tls import managed_grpc_channel, managed_httpx_client
 from kynomesh.client._topology import (
     PeerNotFoundError,
@@ -94,6 +95,10 @@ async def _new_for_peer(name: str, config: ClientConfig | None = None) -> Client
     Unexported: this always builds a fresh client (a full AgentCard
     resolve + construction), never reuses a cached one. peer_client is
     the public, cached entry point built on top of this.
+
+    Also records a hash of the resolved AgentCard for drift detection,
+    on a best-effort basis: a failure to record the hash must not fail
+    the client build the caller actually asked for.
     """
     peer = lookup_peer(name)
     if not peer.url:
@@ -114,6 +119,11 @@ async def _new_for_peer(name: str, config: ClientConfig | None = None) -> Client
 
     resolver = A2ACardResolver(config.httpx_client or default_httpx_client, peer.url)
     card = await resolver.get_agent_card()
+
+    try:
+        record_peer_hash(name, card)
+    except Exception:  # noqa: BLE001
+        pass
 
     factory = ClientFactory(config)
     return factory.create(card)

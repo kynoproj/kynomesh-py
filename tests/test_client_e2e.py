@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import os
 import uuid
 
 import pytest
@@ -19,7 +20,7 @@ from a2a.utils.constants import TransportProtocol
 
 from kynomesh import client as kynomesh_client
 from kynomesh import server as kynomesh_server
-from kynomesh.client import _topology
+from kynomesh.client import _hash, _topology
 from kynomesh.client.client import _reset_peer_client_cache
 
 
@@ -277,5 +278,54 @@ async def test_peer_client_retries_after_failure(tmp_path, unused_tcp_port_facto
     serve_task = await _run_echo_server(tmp_path, unused_tcp_port_factory)
     try:
         await kynomesh_client.peer_client("echo")
+    finally:
+        await _stop_server(serve_task)
+
+
+@pytest.fixture(autouse=True)
+def _reset_hash_state(tmp_path):
+    prev_path = _hash._peer_hashes_path
+    _hash._peer_hashes_path = str(tmp_path / "peer-hashes.json")
+    _hash._reset_peer_hashes_state()
+    yield
+    _hash._reset_peer_hashes_state()
+    _hash._peer_hashes_path = prev_path
+
+
+async def test_peer_client_records_hash_on_first_build(
+    tmp_path, unused_tcp_port_factory, monkeypatch
+):
+    monkeypatch.setenv("POD_NAME", "test-pod")
+    serve_task = await _run_echo_server(tmp_path, unused_tcp_port_factory)
+    try:
+        await kynomesh_client.peer_client("echo")
+        hashes = _hash._read_peer_hashes(_hash._peer_hashes_path)
+        assert "echo" in hashes
+    finally:
+        await _stop_server(serve_task)
+
+
+async def test_peer_client_does_not_record_hash_for_uncalled_peer(
+    tmp_path, unused_tcp_port_factory, monkeypatch
+):
+    monkeypatch.setenv("POD_NAME", "test-pod")
+    serve_task = await _run_echo_server(tmp_path, unused_tcp_port_factory)
+    try:
+        # No peer_client call here: merely being reachable must not
+        # trigger a hash write.
+        hashes = _hash._read_peer_hashes(_hash._peer_hashes_path)
+        assert hashes == {}
+    finally:
+        await _stop_server(serve_task)
+
+
+async def test_peer_client_does_not_record_hash_outside_pod(
+    tmp_path, unused_tcp_port_factory, monkeypatch
+):
+    monkeypatch.delenv("POD_NAME", raising=False)
+    serve_task = await _run_echo_server(tmp_path, unused_tcp_port_factory)
+    try:
+        await kynomesh_client.peer_client("echo")
+        assert not os.path.exists(_hash._peer_hashes_path)
     finally:
         await _stop_server(serve_task)
