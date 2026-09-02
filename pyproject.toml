@@ -11,6 +11,7 @@ dependencies = [
     # which conflicts with a2a-sdk's protobuf 6.x runtime requirement.
     "grpcio-health-checking>=1.75,<1.77",
     "protobuf>=6,<7",
+    "rfc8785>=0.1.4",
     "uvicorn>=0.30",
 ]
 
