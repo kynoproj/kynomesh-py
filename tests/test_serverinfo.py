@@ -36,3 +36,10 @@ def test_default_sets_language_and_protocol():
     info = serverinfo.default(serverinfo.PROTOCOL_UDS)
     assert info.protocol == serverinfo.PROTOCOL_UDS
     assert info.language == serverinfo.LANGUAGE_PYTHON
+
+
+def test_sdk_version_matches_installed_package():
+    # _PACKAGE_NAME must match the distribution name in pyproject.toml
+    # ("kynomesh"), or this silently returns "" for every installed
+    # package.
+    assert serverinfo.sdk_version() != ""

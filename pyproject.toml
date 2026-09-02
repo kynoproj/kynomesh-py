@@ -1,5 +1,5 @@
 [project]
-name = "pykynomesh"
+name = "kynomesh"
 version = "0.1.0"
 description = "Kynomesh Python SDK"
 readme = "README.md"

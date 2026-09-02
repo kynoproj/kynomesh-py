@@ -23,7 +23,7 @@ straight from `a2a-sdk`. This SDK does not wrap or replace those types.
 ## Install
 
 ```bash
-pip install pykynomesh
+pip install kynomesh
 ```
 
 ## Server: write an agent

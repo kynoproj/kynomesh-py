@@ -16,7 +16,7 @@ from importlib.metadata import PackageNotFoundError, version
 # Keep in sync with kmv1.ServerInfoFilePath in kynoproj/kynomesh.
 DEFAULT_FILE_PATH = "/var/run/kynomesh/server-info"
 
-_PACKAGE_NAME = "kynomesh-py"
+_PACKAGE_NAME = "kynomesh"
 
 LANGUAGE_PYTHON = "python"
 
