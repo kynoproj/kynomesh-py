@@ -1,5 +1,6 @@
 import json
 import os
+from datetime import datetime, timezone
 
 import pytest
 import rfc8785
@@ -47,7 +48,23 @@ def test_record_peer_hash_writes_entry_in_pod(monkeypatch):
     _hash.record_peer_hash("worker-a", card)
 
     hashes = _hash._read_peer_hashes(_hash._peer_hashes_path)
-    assert hashes == {"worker-a": _hash.hash_agent_card(card)}
+    assert set(hashes.keys()) == {"worker-a"}
+    assert hashes["worker-a"]["hash"] == _hash.hash_agent_card(card)
+    observed_at = hashes["worker-a"]["observedAt"]
+    assert observed_at.endswith("Z")
+    datetime.fromisoformat(observed_at.replace("Z", "+00:00"))
+
+
+def test_record_peer_hash_sets_observed_at_when_hash_is_recorded(monkeypatch):
+    monkeypatch.setenv("POD_NAME", "test-pod")
+    fixed = datetime(2026, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
+    monkeypatch.setattr(_hash, "now", lambda: fixed)
+
+    card = AgentCard(name="worker-a", version="0.0.1")
+    _hash.record_peer_hash("worker-a", card)
+
+    hashes = _hash._read_peer_hashes(_hash._peer_hashes_path)
+    assert hashes["worker-a"]["observedAt"] == "2026-01-02T03:04:05Z"
 
 
 def test_record_peer_hash_accumulates_across_peers(monkeypatch):
@@ -59,22 +76,24 @@ def test_record_peer_hash_accumulates_across_peers(monkeypatch):
     _hash.record_peer_hash("worker-b", card_b)
 
     hashes = _hash._read_peer_hashes(_hash._peer_hashes_path)
-    assert hashes == {
-        "worker-a": _hash.hash_agent_card(card_a),
-        "worker-b": _hash.hash_agent_card(card_b),
-    }
+    assert set(hashes.keys()) == {"worker-a", "worker-b"}
+    assert hashes["worker-a"]["hash"] == _hash.hash_agent_card(card_a)
+    assert hashes["worker-b"]["hash"] == _hash.hash_agent_card(card_b)
 
 
 def test_record_peer_hash_clears_stale_file_on_first_use(monkeypatch):
     monkeypatch.setenv("POD_NAME", "test-pod")
-    _hash._write_peer_hashes(_hash._peer_hashes_path, {"stale-peer": "deadbeef"})
+    _hash._write_peer_hashes(
+        _hash._peer_hashes_path,
+        {"stale-peer": {"hash": "deadbeef", "observedAt": "2020-01-01T00:00:00Z"}},
+    )
 
     card = AgentCard(name="worker-a", version="0.0.1")
     _hash.record_peer_hash("worker-a", card)
 
     hashes = _hash._read_peer_hashes(_hash._peer_hashes_path)
     assert "stale-peer" not in hashes
-    assert hashes["worker-a"] == _hash.hash_agent_card(card)
+    assert hashes["worker-a"]["hash"] == _hash.hash_agent_card(card)
 
 
 def test_record_peer_hash_does_not_reclear_on_second_call(monkeypatch):
@@ -87,8 +106,11 @@ def test_record_peer_hash_does_not_reclear_on_second_call(monkeypatch):
     # something else touching the file) must not be wiped by the
     # second record_peer_hash call: the clear-once guard only fires
     # once per process.
-    _hash._write_peer_hashes(_hash._peer_hashes_path, {"worker-a": "deadbeef"})
+    _hash._write_peer_hashes(
+        _hash._peer_hashes_path,
+        {"worker-a": {"hash": "deadbeef", "observedAt": "2020-01-01T00:00:00Z"}},
+    )
     _hash.record_peer_hash("worker-b", card_b)
 
     hashes = _hash._read_peer_hashes(_hash._peer_hashes_path)
-    assert hashes["worker-b"] == _hash.hash_agent_card(card_b)
+    assert hashes["worker-b"]["hash"] == _hash.hash_agent_card(card_b)
