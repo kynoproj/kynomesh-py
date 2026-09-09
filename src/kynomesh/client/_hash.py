@@ -14,10 +14,20 @@ import json
 import os
 import tempfile
 import threading
+from datetime import datetime, timezone
+from typing import Any
 
 import rfc8785
 from a2a.types.a2a_pb2 import AgentCard
 from google.protobuf.json_format import MessageToDict
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+# now is a test seam wrapping _utcnow.
+now = _utcnow
 
 # _ENV_POD_NAME mirrors kynomesh.server's in-pod signal: set by the
 # Kynomesh pod spec, absent in local dev.
@@ -80,6 +90,7 @@ def record_peer_hash(name: str, card: AgentCard) -> None:
         return
 
     hash_ = hash_agent_card(card)
+    observed_at = now()
 
     global _initialized
     with _init_lock:
@@ -92,13 +103,25 @@ def record_peer_hash(name: str, card: AgentCard) -> None:
 
     with _hashes_lock:
         hashes = _read_peer_hashes(_peer_hashes_path)
-        hashes[name] = hash_
+        hashes[name] = {
+            "hash": hash_,
+            "observedAt": _format_rfc3339(observed_at),
+        }
         _write_peer_hashes(_peer_hashes_path, hashes)
 
 
-def _read_peer_hashes(path: str) -> dict[str, str]:
-    """Returns the current peer name -> hash map, or an empty map if the
-    file does not exist yet.
+def _format_rfc3339(dt: datetime) -> str:
+    """Formats dt (must be timezone-aware) as RFC3339 with a literal
+    "Z" suffix for UTC, matching the format Go's encoding/json produces
+    for time.Time — kept consistent so the broker sees the same
+    observedAt shape regardless of which SDK wrote it.
+    """
+    return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _read_peer_hashes(path: str) -> dict[str, Any]:
+    """Returns the current peer name -> entry map, or an empty map if
+    the file does not exist yet.
     """
     try:
         with open(path, "rb") as f:
@@ -108,7 +131,7 @@ def _read_peer_hashes(path: str) -> dict[str, str]:
     return json.loads(raw)
 
 
-def _write_peer_hashes(path: str, hashes: dict[str, str]) -> None:
+def _write_peer_hashes(path: str, hashes: dict[str, Any]) -> None:
     """Serializes hashes as JSON and writes it atomically to path, so a
     concurrent reader (the broker) never observes a half-written file.
     """
