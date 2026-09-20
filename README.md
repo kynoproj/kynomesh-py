@@ -104,6 +104,51 @@ What `server.start` does for you:
 
 Full example: [examples/helloworld/server](examples/helloworld/server).
 
+### Exposing multiple transports
+
+`supported_interfaces` is a list — list every transport you want callers to be
+able to use. Most agents only need one, but you can advertise more than one and
+let each caller pick:
+
+| Transport        | `TransportProtocol` constant  | Wire string |
+| ---------------- | ----------------------------- | ----------- |
+| JSON-RPC         | `TransportProtocol.JSONRPC`   | `JSONRPC`   |
+| REST (HTTP+JSON) | `TransportProtocol.HTTP_JSON` | `HTTP+JSON` |
+| gRPC             | `TransportProtocol.GRPC`      | `GRPC`      |
+
+```python
+def hello_world_card() -> AgentCard:
+    return AgentCard(
+        name="Hello World Agent",
+        version="0.0.1",
+        supported_interfaces=[
+            AgentInterface(
+                url="http://127.0.0.1:8088/a2a/jsonrpc",
+                protocol_binding=TransportProtocol.JSONRPC.value,
+            ),
+            AgentInterface(
+                url="http://127.0.0.1:8088/a2a/rest",
+                protocol_binding=TransportProtocol.HTTP_JSON.value,
+            ),
+            AgentInterface(
+                url="127.0.0.1:8089",
+                protocol_binding=TransportProtocol.GRPC.value,
+            ),
+        ],
+        default_input_modes=["text"],
+        default_output_modes=["text"],
+    )
+```
+
+`server.start` reads each interface's `protocol_binding` to decide which
+transports to mount — `HTTP_JSON` mounts the REST path shown above, separate
+from the JSON-RPC path, both on the same HTTP listener. The `url` on each
+interface is only used locally to pick the transport's path or address; it isn't
+used to bind the listener itself. Running in-cluster, Kynomesh's broker sidecar
+fronts your agent and rewrites these URLs to the externally reachable address
+before advertising it to peers, so you don't need to construct real addresses
+yourself.
+
 ## Health checks
 
 `server.start` always mounts two health endpoints, one per listener, so
