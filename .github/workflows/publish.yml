@@ -6,7 +6,7 @@ on:
       - "v*.*.*"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   publish:
@@ -40,3 +40,8 @@ jobs:
         env:
           UV_PUBLISH_USERNAME: __token__
           UV_PUBLISH_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+
+      - name: Create GitHub release
+        run: gh release create "${GITHUB_REF_NAME}" dist/* --title "${GITHUB_REF_NAME}" --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}
