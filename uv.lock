@@ -882,7 +882,6 @@ wheels = [
 
 [[package]]
 name = "kynomesh"
-version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "a2a-sdk", extra = ["grpc", "http-server"] },
@@ -904,7 +903,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "a2a-sdk", extras = ["http-server", "grpc"], specifier = ">=1.1.2" },
+    { name = "a2a-sdk", extras = ["grpc", "http-server"], specifier = ">=1.1.2" },
     { name = "fastapi", specifier = ">=0.110" },
     { name = "grpcio-health-checking", specifier = ">=1.75,<1.77" },
     { name = "protobuf", specifier = ">=6,<7" },
