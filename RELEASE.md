@@ -1,6 +1,7 @@
 # Release Process
 
-This project publishes to PyPI automatically when a version tag is pushed.
+This project publishes to PyPI and creates a GitHub release automatically when a
+version tag is pushed.
 
 ## Versioning
 
@@ -27,6 +28,8 @@ building.
    - Writes that version into `__version__` in `src/kynomesh/__init__.py`.
    - Builds the sdist and wheel with `uv build`.
    - Publishes both to PyPI with `uv publish`.
+   - Creates a GitHub release for the tag, attaching the built sdist/wheel and
+     auto-generating release notes from merged PRs.
 
 No manual version bump or commit is required — the tag is the single source of
 truth for the published version.
