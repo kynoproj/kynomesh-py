@@ -240,9 +240,8 @@ async def main() -> None:
     # Discover the peer, fetch its AgentCard, and build an a2a
     # client — once per process per peer name; later calls for the
     # same peer reuse the cached client. For Managed peer agents
-    # reached over gRPC, the first build pins the broker's certificate
-    # for the hop (TLS-encrypted but unauthenticated, like the Go
-    # SDK's InsecureSkipVerify).
+    # reached over TLS, the build skips certificate verification for the
+    # hop. See "External peers and TLS" below.
     a2a_client = await client.peer_client("worker-a")
     request = SendMessageRequest(
         message=Message(
@@ -276,8 +275,10 @@ across OS threads or multiple event loops.
 Peers in the same `AgentSet` (Managed) are reached over the broker's self-signed
 TLS certificate, so the SDK skips certificate verification for them (the hop is
 encrypted, the peer is not authenticated). External peers, declared in
-`externalAgents`, are expected to present a real, CA-verifiable certificate, so
-the SDK verifies them normally.
+`externalAgents` (see the
+[core concepts](https://github.com/kynoproj/kynomesh/blob/main/docs/core-concepts/overview.md)),
+are expected to present a real, CA-verifiable certificate, so the SDK verifies
+them normally.
 
 The exception is an External peer that is itself an agent in **another
 AgentSet**. Its broker presents a self-signed certificate too, so verification
@@ -291,11 +292,14 @@ env:
 ```
 
 Nothing changes in your code: `peer_client("calculator")` works the same. The
-setting only applies to the named External peers, is read on every call, and
-logs a warning when it takes effect. Leave it unset for a real external agent
-with a CA-signed certificate.
+setting only applies to the named External peers and logs a warning when it
+takes effect. It is read each time a peer's client is built, and clients are
+cached, so after changing it call `client.forget_peer("calculator")` to rebuild.
+Leave it unset for a real external agent with a CA-signed certificate.
 
-Lower-level helpers when you don't want the full client:
+### Lower-level helpers
+
+Use these when you don't want the full client:
 
 ```python
 url = client.peer_url("worker-a")  # just the URL
