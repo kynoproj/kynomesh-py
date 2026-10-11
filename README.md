@@ -271,6 +271,30 @@ client.forget_peer("worker-a")
 Concurrency scope is single-event-loop asyncio: don't share a cached peer client
 across OS threads or multiple event loops.
 
+### External peers and TLS
+
+Peers in the same `AgentSet` (Managed) are reached over the broker's self-signed
+TLS certificate, so the SDK skips certificate verification for them (the hop is
+encrypted, the peer is not authenticated). External peers, declared in
+`externalAgents`, are expected to present a real, CA-verifiable certificate, so
+the SDK verifies them normally.
+
+The exception is an External peer that is itself an agent in **another
+AgentSet**. Its broker presents a self-signed certificate too, so verification
+fails with `CERTIFICATE_VERIFY_FAILED`. Name such peers in
+`KYNOMESH_INSECURE_TLS_PEERS` to give them the same treatment as Managed peers:
+
+```yaml
+env:
+  - name: KYNOMESH_INSECURE_TLS_PEERS
+    value: calculator # comma-separated peer names
+```
+
+Nothing changes in your code: `peer_client("calculator")` works the same. The
+setting only applies to the named External peers, is read on every call, and
+logs a warning when it takes effect. Leave it unset for a real external agent
+with a CA-signed certificate.
+
 Lower-level helpers when you don't want the full client:
 
 ```python

@@ -12,6 +12,9 @@ format:
 
 from __future__ import annotations
 
+import logging
+import os
+
 import httpx
 from a2a.client.card_resolver import A2ACardResolver
 from a2a.client.client import Client, ClientConfig
@@ -23,6 +26,7 @@ from kynomesh.client._cache import AsyncKeyedCache
 from kynomesh.client._hash import record_peer_hash
 from kynomesh.client._managed_tls import managed_grpc_channel, managed_httpx_client
 from kynomesh.client._topology import (
+    Peer,
     PeerNotFoundError,
     TopologyNotAvailableError,
     lookup_peer,
@@ -45,6 +49,32 @@ __all__ = [
 # non-Managed (External) peers, which are expected to present real,
 # CA-verifiable certificates.
 default_httpx_client = httpx.AsyncClient(timeout=30.0)
+
+_logger = logging.getLogger(__name__)
+
+INSECURE_TLS_PEERS_ENV = "KYNOMESH_INSECURE_TLS_PEERS"
+"""Comma-separated names of External peers whose TLS certificate is not verified.
+
+An External peer is normally expected to present a CA-verifiable certificate. The
+exception is an agent in another AgentSet, referenced via `externalAgents`: its
+broker presents a self-signed certificate, which can never verify. Naming such a
+peer here gives it the same treatment Managed peers get (encrypted, but the peer
+is not authenticated). Managed peers need no entry.
+"""
+
+
+def _insecure_tls_peers() -> frozenset[str]:
+    raw = os.environ.get(INSECURE_TLS_PEERS_ENV, "")
+    return frozenset(name.strip() for name in raw.split(",") if name.strip())
+
+
+def _skips_tls_verify(peer: Peer) -> bool:
+    """Whether TLS verification is skipped for the peer.
+
+    Always for Managed peers; for External peers only when named in
+    KYNOMESH_INSECURE_TLS_PEERS. Read on every call so it can change at runtime.
+    """
+    return peer.is_managed or peer.name in _insecure_tls_peers()
 
 
 def peer_url(name: str) -> str:
@@ -78,7 +108,7 @@ async def resolve_agent_card(name: str) -> AgentCard:
     if not peer.url:
         raise ValueError(f"kynomesh: peer {name!r} has no URL in topology")
 
-    httpx_client = managed_httpx_client if peer.is_managed else default_httpx_client
+    httpx_client = managed_httpx_client if _skips_tls_verify(peer) else default_httpx_client
     resolver = A2ACardResolver(httpx_client, peer.url)
     return await resolver.get_agent_card()
 
@@ -90,7 +120,8 @@ async def _new_for_peer(name: str, config: ClientConfig | None = None) -> Client
     topology, resolve its AgentCard, and construct a client over one of
     the interfaces the card advertises. For Managed peers, TLS
     verification is skipped for both the AgentCard fetch and the client
-    transport, unless config overrides those defaults.
+    transport, unless config overrides those defaults. The same applies to
+    External peers named in KYNOMESH_INSECURE_TLS_PEERS.
 
     Unexported: this always builds a fresh client (a full AgentCard
     resolve + construction), never reuses a cached one. peer_client is
@@ -105,7 +136,13 @@ async def _new_for_peer(name: str, config: ClientConfig | None = None) -> Client
         raise ValueError(f"kynomesh: peer {name!r} has no URL in topology")
 
     config = config or ClientConfig()
-    if peer.is_managed:
+    if not peer.is_managed and _skips_tls_verify(peer):
+        _logger.warning(
+            "kynomesh: TLS verification disabled for external peer %r (listed in %s)",
+            name,
+            INSECURE_TLS_PEERS_ENV,
+        )
+    if _skips_tls_verify(peer):
         if config.httpx_client is None:
             config.httpx_client = managed_httpx_client
         if config.grpc_channel_factory is None:
