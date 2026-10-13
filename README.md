@@ -328,9 +328,6 @@ async for response in a2a_client.send_message(request, context=context):
   `client.forget_peer("fraud-check")` and then `peer_client(...)` again.
 - **Redirects are not followed** on the card request, so the headers are never
   re-sent to another host.
-- **Mind TLS verification.** For a peer whose certificate is not verified (a
-  Managed peer, or one named in `KYNOMESH_INSECURE_TLS_PEERS`) the SDK logs a
-  warning, because the headers can be read by anyone on the network path.
 - Malformed headers raise `ValueError` before any request is made: a name with
   anything other than letters, digits, `-`, `_` and `.` (or starting with
   `grpc-`), a value that is not printable ASCII (including line breaks), or the
