@@ -297,6 +297,47 @@ takes effect. It is read each time a peer's client is built, and clients are
 cached, so after changing it call `client.forget_peer("calculator")` to rebuild.
 Leave it unset for a real external agent with a CA-signed certificate.
 
+### Peers that protect their AgentCard
+
+Some peers require a header, such as an `Authorization` header or an API key,
+just to read their AgentCard. Pass `card_headers` to `peer_client`. The headers
+are sent on the AgentCard request only:
+
+```python
+import os
+
+a2a_client = await client.peer_client(
+    "fraud-check",
+    card_headers={"Authorization": f"Bearer {os.environ['FRAUD_CHECK_TOKEN']}"},
+)
+```
+
+They are **not** attached to calls made through the client. Authenticate each
+call yourself:
+
+```python
+from a2a.client.client import ClientCallContext
+
+context = ClientCallContext(service_parameters={"Authorization": f"Bearer {fresh_token}"})
+async for response in a2a_client.send_message(request, context=context):
+    ...
+```
+
+- Headers are applied when the client is first built. Clients are cached, so
+  `card_headers` passed on later calls are ignored. After a token changes, call
+  `client.forget_peer("fraud-check")` and then `peer_client(...)` again.
+- **Redirects are not followed** on the card request, so the headers are never
+  re-sent to another host.
+- **Mind TLS verification.** For a peer whose certificate is not verified (a
+  Managed peer, or one named in `KYNOMESH_INSECURE_TLS_PEERS`) the SDK logs a
+  warning, because the headers can be read by anyone on the network path.
+- Malformed headers raise `ValueError` before any request is made: a name with
+  anything other than letters, digits, `-`, `_` and `.` (or starting with
+  `grpc-`), a value that is not printable ASCII (including line breaks), or the
+  same name given twice in different cases. The error never includes the value.
+- To fetch a card on its own, use
+  `client.resolve_agent_card(name, headers=...)`.
+
 ### Lower-level helpers
 
 Use these when you don't want the full client:

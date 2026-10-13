@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Mapping
 
 import httpx
 from a2a.client.card_resolver import A2ACardResolver
@@ -24,6 +25,7 @@ from a2a.utils.constants import TransportProtocol
 
 from kynomesh.client._cache import AsyncKeyedCache
 from kynomesh.client._hash import record_peer_hash
+from kynomesh.client._headers import validate_headers
 from kynomesh.client._managed_tls import managed_grpc_channel, managed_httpx_client
 from kynomesh.client._topology import (
     Peer,
@@ -98,11 +100,15 @@ def peers() -> list[str]:
     return _peer_names()
 
 
-async def resolve_agent_card(name: str) -> AgentCard:
+async def resolve_agent_card(name: str, *, headers: Mapping[str, str] | None = None) -> AgentCard:
     """Fetches the AgentCard of the named peer from its well-known location.
 
     The peer URL is looked up in the topology. For Managed peers, TLS
     verification is skipped on the card fetch.
+
+    `headers` are sent on the card request only, for a peer whose card
+    requires auth. Redirects are not followed, so they are never re-sent to
+    another host. Raises ValueError if a header is malformed.
     """
     peer = lookup_peer(name)
     if not peer.url:
@@ -110,10 +116,26 @@ async def resolve_agent_card(name: str) -> AgentCard:
 
     httpx_client = managed_httpx_client if _skips_tls_verify(peer) else default_httpx_client
     resolver = A2ACardResolver(httpx_client, peer.url)
-    return await resolver.get_agent_card()
+    return await resolver.get_agent_card(**_card_request_kwargs(headers))
 
 
-async def _new_for_peer(name: str, config: ClientConfig | None = None) -> Client:
+def _card_request_kwargs(headers: Mapping[str, str] | None) -> dict[str, dict[str, object]]:
+    """Keyword arguments for `get_agent_card` that carry `headers`, if any.
+
+    Redirects are refused whatever the HTTP client's default: httpx would re-send
+    custom headers to the redirect target, which could be another host.
+    """
+    if not headers:
+        return {}
+    return {"http_kwargs": {"headers": validate_headers(headers), "follow_redirects": False}}
+
+
+async def _new_for_peer(
+    name: str,
+    config: ClientConfig | None = None,
+    *,
+    card_headers: Mapping[str, str] | None = None,
+) -> Client:
     """Returns an a2a Client wired to the named peer.
 
     Performs the full peer-discovery flow: look up the peer URL in the
@@ -126,6 +148,9 @@ async def _new_for_peer(name: str, config: ClientConfig | None = None) -> Client
     Unexported: this always builds a fresh client (a full AgentCard
     resolve + construction), never reuses a cached one. peer_client is
     the public, cached entry point built on top of this.
+
+    `card_headers`, if given, are sent on the AgentCard fetch only, never on
+    calls made through the returned client.
 
     Also records a hash of the resolved AgentCard for drift detection,
     on a best-effort basis: a failure to record the hash must not fail
@@ -154,16 +179,22 @@ async def _new_for_peer(name: str, config: ClientConfig | None = None) -> Client
                 TransportProtocol.GRPC,
             ]
 
+    if card_headers and _skips_tls_verify(peer):
+        _logger.warning(
+            "kynomesh: sending card headers to peer %r without TLS verification; "
+            "they can be read by anyone on the network path",
+            name,
+        )
+
     resolver = A2ACardResolver(config.httpx_client or default_httpx_client, peer.url)
-    card = await resolver.get_agent_card()
+    card = await resolver.get_agent_card(**_card_request_kwargs(card_headers))
 
     try:
         record_peer_hash(name, card)
     except Exception:  # noqa: BLE001
         pass
 
-    factory = ClientFactory(config)
-    return factory.create(card)
+    return ClientFactory(config).create(card)
 
 
 # _peer_client_cache lazily builds and caches one Client per peer name
@@ -172,7 +203,7 @@ async def _new_for_peer(name: str, config: ClientConfig | None = None) -> Client
 _peer_client_cache: AsyncKeyedCache[Client] = AsyncKeyedCache(_new_for_peer)
 
 
-async def peer_client(name: str) -> Client:
+async def peer_client(name: str, *, card_headers: Mapping[str, str] | None = None) -> Client:
     """Returns the cached a2a Client for the named peer, building it on
     first use and reusing it on every subsequent call for the same
     peer name.
@@ -187,11 +218,20 @@ async def peer_client(name: str) -> Client:
     cross-thread. Do not share a cached peer client across OS threads
     or multiple event loops.
 
+    `card_headers` (for example `{"Authorization": "Bearer ..."}`) are sent
+    on the AgentCard fetch only, for a peer that protects its card. They are
+    NOT attached to calls made through the client: authenticate each call
+    yourself, with a `ClientCallContext(service_parameters=...)` per call or
+    an interceptor in `ClientConfig`. They are applied only when the client
+    is first built; once it is cached, later `card_headers` are ignored. Call
+    forget_peer(name) first to rebuild with new ones. Raises ValueError if a
+    header is malformed.
+
     Callers should not call close() on the returned client: it is
     shared and reused by later callers. Use forget_peer(name) to drop
     the cached entry instead.
     """
-    return await _peer_client_cache.get(name)
+    return await _peer_client_cache.get(name, card_headers=card_headers)
 
 
 def forget_peer(name: str) -> None:
