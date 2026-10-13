@@ -11,7 +11,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar
 
 _T = TypeVar("_T")
 
@@ -32,20 +32,21 @@ class _CacheEntry(Generic[_T]):
 class AsyncKeyedCache(Generic[_T]):
     """A lazy, per-key async value cache for a single event loop.
 
-    The first call for a given key runs `builder(key)` and caches the
-    result; every later call for that key returns the cached value.
+    The first call for a given key runs `builder(key, **build_kwargs)` and caches
+    the result; every later call for that key returns the cached value and
+    ignores its `build_kwargs`.
     Concurrent first-use of the same key is safe: only one caller runs
     the builder, and the rest await its result.
 
     Not safe to share across threads or event loops.
     """
 
-    def __init__(self, builder: Callable[[str], Awaitable[_T]]) -> None:
+    def __init__(self, builder: Callable[..., Awaitable[_T]]) -> None:
         self._builder = builder
         self._entries_lock = asyncio.Lock()
         self._entries: dict[str, _CacheEntry[_T]] = {}
 
-    async def get(self, key: str) -> _T:
+    async def get(self, key: str, **build_kwargs: Any) -> _T:
         async with self._entries_lock:
             entry = self._entries.get(key)
             if entry is None:
@@ -55,14 +56,16 @@ class AsyncKeyedCache(Generic[_T]):
         async with entry.lock:
             if not entry.built:
                 try:
-                    entry.value = await self._builder(key)
+                    entry.value = await self._builder(key, **build_kwargs)
                 except Exception as e:  # noqa: BLE001
                     entry.error = e
                     # Don't let a failed build permanently poison the
                     # cache for this key: evict now so the next call
                     # gets a fresh attempt instead of the same error
-                    # forever.
-                    self.forget(key)
+                    # forever. Only evict this entry: a newer one another
+                    # caller has since built must stay.
+                    if self._entries.get(key) is entry:
+                        self.forget(key)
                     raise
                 entry.built = True
 
